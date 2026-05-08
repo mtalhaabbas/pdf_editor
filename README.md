@@ -42,7 +42,7 @@ A modern, interactive web-based PDF text editor that allows you to click on any 
 ### 1. Clone the Repository
 ```bash
 git clone https://github.com/mtalhaabbas/pdf_editor.git
-cd pdf-text-editor
+cd pdf_editor
 ```
 
 ### 2. Install Python Dependencies
