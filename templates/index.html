@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Text Editor - Professional PDF Editing Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #4338CA;
+            --primary-light: #818CF8;
+            --secondary: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --dark: #1F2937;
+            --gray: #6B7280;
+            --light-gray: #F3F4F6;
+            --border: #E5E7EB;
+            --white: #FFFFFF;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container { 
+            display: flex;
+            flex-direction: column;
+            height: 100vh; 
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+        }
+        
+        /* Sidebar Styles - Now Top Bar */
+        .sidebar { 
+            width: 100%;
+            min-width: 100%;
+            height: auto;
+            background: var(--white);
+            padding: 0;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            overflow-y: hidden;
+            transition: transform 0.3s ease, height 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            flex-shrink: 0;
+        }
+        
+        .sidebar.hidden { 
+            transform: translateY(-100%);
+            height: 0;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: fit-content;
+        }
+        
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+            white-space: nowrap;
+        }
+        
+        .sidebar-header p {
+            display: none;
+        }
+        
+        .sidebar-content {
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            background: var(--white);
+        }
+        
+        .section {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            white-space: nowrap;
+        }
+        
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray);
+            margin: 0;
+        }
+        
+        /* Viewer Styles */
+        .viewer { 
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+            width: 100%;
+        }
+        
+        .viewer-inner {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 20px;
+            padding: 0 20px;
+        }
+        
+        /* Toggle Button */
+        .toggle-sidebar { 
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 200;
+            padding: 12px;
+            background: var(--white);
+            color: var(--primary);
+            border: none;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: var(--shadow-lg);
+            font-weight: 600;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle-sidebar:hover { 
+            background: var(--primary);
+            color: var(--white);
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 12px 20px -5px rgba(79, 70, 229, 0.4);
+        }
+        
+        .toggle-sidebar.sidebar-hidden { 
+            right: 20px;
+        }
+        
+        /* Canvas Container */
+        .canvas-container { 
+            position: relative;
+            display: none;
+            background: var(--white);
+            box-shadow: var(--shadow-lg);
+            border-radius: 12px;
+            overflow: hidden;
+            max-width: 1200px;
+            width: fit-content;
+        }
+        
+        .canvas-container.loaded {
+            display: inline-block;
+        }
+        
+        #pdfCanvas { 
+            display: block;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            max-width: 1200px;
+            width: 100%;
+            height: auto;
+        }
+        
+        /* Text Overlay */
+        .text-overlay { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: pointer;
+            pointer-events: none;
+        }
+        
+        .text-box { 
+            position: absolute;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            pointer-events: all;
+            cursor: pointer;
+        }
+        
+        .text-box:hover { 
+            border: 2px solid var(--primary);
+            background: rgba(79, 70, 229, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .text-box.ocr-text { 
+            border: 1px dashed var(--warning);
+        }
+        
+        .text-box.ocr-text:hover { 
+            border: 2px solid var(--warning);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        /* Form Elements */
+        input[type="file"] { 
+            padding: 8px 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--light-gray);
+            width: auto;
+            min-width: 200px;
+        }
+        
+        input[type="file"]:hover {
+            border-color: var(--primary);
+            background: var(--white);
+        }
+        
+        button { 
+            padding: 10px 20px;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            width: auto;
+            margin: 0;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+            white-space: nowrap;
+        }
+        
+        button:hover { 
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px -3px rgba(79, 70, 229, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled { 
+            background: var(--gray);
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
+        
+        button.secondary {
+            background: var(--secondary);
+        }
+        
+        button.secondary:hover {
+            background: #059669;
+        }
+        
+        /* Page Navigation */
+        .page-nav { 
+            display: flex;
+            gap: 8px;
+            margin: 0;
+            align-items: center;
+        }
+        
+        /* Info Box */
+        .info { 
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+            border-radius: 8px;
+            margin: 0;
+            font-size: 12px;
+            border-left: 4px solid var(--primary);
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            white-space: nowrap;
+        }
+        
+        .info strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .info-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+        }
+        
+        .info-label {
+            color: var(--gray);
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: var(--dark);
+            font-weight: 600;
+        }
+        
+        /* Modal */
+        .modal { 
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content { 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--white);
+            padding: 32px;
+            border-radius: 16px;
+            min-width: 90%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translate(-50%, -40%);
+            }
+            to { 
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        .modal h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+        
+        .modal input { 
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        .modal input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .modal-buttons { 
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .modal-buttons button { 
+            flex: 1;
+            margin: 0;
+        }
+        
+        .modal-buttons button:first-child {
+            background: var(--light-gray);
+            color: var(--dark);
+        }
+        
+        .modal-buttons button:first-child:hover {
+            background: var(--border);
+        }
+        
+        .original-text { 
+            background: var(--light-gray);
+            padding: 14px;
+            border-radius: 8px;
+            margin: 12px 0;
+            word-wrap: break-word;
+            font-size: 14px;
+            color: var(--gray);
+            border-left: 3px solid var(--primary);
+        }
+        
+        /* Loading Indicator */
+        .loading { 
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: var(--white);
+            padding: 24px 48px;
+            border-radius: 12px;
+            z-index: 2000;
+            display: none;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid var(--white);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 12px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Legend */
+        .legend {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            margin: 0;
+            font-size: 12px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+        }
+        
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid;
+            flex-shrink: 0;
+        }
+        
+        .legend-box.text {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.1);
+        }
+        
+        .legend-box.ocr {
+            border: 2px dashed var(--warning);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar-content {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            
+            .section {
+                flex-wrap: wrap;
+            }
+            
+            input[type="file"] {
+                min-width: 150px;
+                font-size: 12px;
+            }
+            
+            button {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+            
+            .viewer {
+                padding: 80px 10px 10px 10px;
+            }
+            
+            .toggle-sidebar {
+                top: 10px;
+                right: 10px;
+                width: 44px;
+                height: 44px;
+                padding: 10px;
+                font-size: 18px;
+            }
+            
+            .modal-content {
+                min-width: 85%;
+                padding: 24px;
+            }
+            
+            .canvas-container {
+                max-width: 100%;
+                width: 100%;
+            }
+            
+            #pdfCanvas {
+                max-width: 100%;
+                height: auto;
+            }
+            
+            .sidebar-header h1 {
+                font-size: 16px;
+            }
+            
+            .legend {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sidebar-content {
+                padding: 12px;
+            }
+            
+            .sidebar-header {
+                padding: 12px 16px;
+            }
+            
+            .sidebar-header h1 {
+                font-size: 14px;
+            }
+            
+            .modal-content {
+                min-width: 95%;
+                padding: 20px;
+            }
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--light-gray);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--gray);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>📄 PDF Text Editor</h1>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="section">
+                    <input type="file" id="pdfFile" accept=".pdf">
+                    <button onclick="uploadPDF()">📤 Load PDF</button>
+                </div>
+                
+                <div id="pdfInfo" class="info" style="display: none;">
+                    <div class="info-item">
+                        <span class="info-label">Pages:</span>
+                        <span class="info-value" id="pageCount">0</span>
+                    </div>
+                    <span style="color: var(--border);">|</span>
+                    <div class="info-item">
+                        <span class="info-label">Current:</span>
+                        <span class="info-value" id="currentPage">1</span>
+                    </div>
+                </div>
+                
+                <div id="navigation" style="display: none;">
+                    <div class="page-nav">
+                        <button onclick="prevPage()">← Prev</button>
+                        <button onclick="nextPage()">Next →</button>
+                    </div>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-box text"></div>
+                        <span>Native Text</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box ocr"></div>
+                        <span>OCR Text</span>
+                    </div>
+                </div>
+                
+                <div id="downloadSection" style="display: none;">
+                    <button class="secondary" onclick="downloadPDF()">💾 Download</button>
+                </div>
+            </div>
+        </div>
+        
+        <button class="toggle-sidebar" id="toggleSidebar" onclick="toggleSidebar()">
+            <span id="toggleIcon">×</span>
+        </button>
+        
+        <div class="viewer">
+            <div class="viewer-inner">
+                <div class="canvas-container">
+                    <canvas id="pdfCanvas"></canvas>
+                    <div class="text-overlay" id="textOverlay"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h2>✏️ Edit Text</h2>
+            <p style="color: var(--gray); margin-bottom: 12px;"><strong>Original Text:</strong></p>
+            <div class="original-text" id="originalText"></div>
+            <input type="text" id="newText" placeholder="Enter new text...">
+            <div class="modal-buttons">
+                <button onclick="closeModal()">Cancel</button>
+                <button onclick="saveEdit()">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">Updating PDF...</div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        let currentFilename = '';
+        let currentPageNum = 0;
+        let totalPages = 0;
+        let textElements = [];
+        let selectedElement = null;
+        let pdfDoc = null;
+        let pageScale = 2.5;  // Increased scale for sharper rendering
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleSidebar');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('hidden');
+            
+            if (sidebar.classList.contains('hidden')) {
+                toggleIcon.textContent = '☰';
+                toggleBtn.classList.add('sidebar-hidden');
+            } else {
+                toggleIcon.textContent = '×';
+                toggleBtn.classList.remove('sidebar-hidden');
+            }
+        }
+
+        async function uploadPDF() {
+            const fileInput = document.getElementById('pdfFile');
+            const file = fileInput.files[0];
+            if (!file) return alert('Please select a file');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await response.json();
+            
+            if (response.ok) {
+                currentFilename = data.filename;
+                totalPages = data.page_count;
+                currentPageNum = 0;
+                
+                document.getElementById('pageCount').textContent = totalPages;
+                document.getElementById('pdfInfo').style.display = 'block';
+                document.getElementById('navigation').style.display = 'block';
+                document.getElementById('downloadSection').style.display = 'block';
+                
+                // Show canvas container
+                document.querySelector('.canvas-container').classList.add('loaded');
+                
+                // Load PDF with PDF.js for crisp rendering
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                
+                loadPage(0);
+            } else {
+                alert(data.error);
+            }
+        }
+
+        async function loadPage(pageNum) {
+            // Get text elements from backend
+            const response = await fetch(`/page/${currentFilename}/${pageNum}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                textElements = data.text_elements;
+                
+                // Render PDF page with PDF.js at high quality
+                const page = await pdfDoc.getPage(pageNum + 1);
+                
+                // Calculate viewport to fit within 1200px max width
+                let scale = pageScale;
+                const baseViewport = page.getViewport({ scale: 1 });
+                
+                // If page is wider than 1200px at current scale, adjust scale
+                if (baseViewport.width * pageScale > 1200) {
+                    scale = 1200 / baseViewport.width;
+                }
+                
+                const viewport = page.getViewport({ scale: scale });
+                
+                const canvas = document.getElementById('pdfCanvas');
+                const context = canvas.getContext('2d');
+                
+                // Support high-DPI displays
+                const outputScale = window.devicePixelRatio || 1;
+                
+                // Set canvas display size
+                canvas.style.width = viewport.width + 'px';
+                canvas.style.height = viewport.height + 'px';
+                
+                // Set actual canvas size (accounting for pixel ratio)
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                
+                // Scale context to match
+                context.scale(outputScale, outputScale);
+                
+                // Enable high-quality rendering
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    intent: 'display',
+                    enableWebGL: true,
+                    renderInteractiveForms: false
+                };
+                
+                await page.render(renderContext).promise;
+                
+                // Render text overlay
+                renderTextOverlay(data.text_elements, scale);
+                
+                currentPageNum = pageNum;
+                document.getElementById('currentPage').textContent = pageNum + 1;
+            }
+        }
+
+        function renderTextOverlay(elements, scale) {
+            const overlay = document.getElementById('textOverlay');
+            overlay.innerHTML = '';
+            
+            elements.forEach((el, idx) => {
+                const div = document.createElement('div');
+                div.className = 'text-box';
+                
+                // Add special styling for OCR text
+                if (el.type === 'ocr') {
+                    div.classList.add('ocr-text');
+                    div.title = `${el.text} (OCR detected, confidence: ${el.confidence || 'N/A'}%)`;
+                } else {
+                    div.title = el.text;
+                }
+                
+                div.style.left = (el.x * scale) + 'px';
+                div.style.top = (el.y * scale) + 'px';
+                div.style.width = (el.width * scale) + 'px';
+                div.style.height = (el.height * scale) + 'px';
+                div.onclick = () => openEditModal(el, idx);
+                overlay.appendChild(div);
+            });
+        }
+
+        function openEditModal(element, idx) {
+            selectedElement = { ...element, idx };
+            document.getElementById('originalText').textContent = element.text;
+            document.getElementById('newText').value = element.text;
+            document.getElementById('editModal').style.display = 'block';
+            document.getElementById('newText').focus();
+            document.getElementById('newText').select();
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+            selectedElement = null;
+        }
+
+        async function saveEdit() {
+            const newText = document.getElementById('newText').value;
+            if (!newText || !selectedElement) return;
+
+            // Store element index before closing modal
+            const elementIndex = selectedElement.idx;
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            closeModal();
+
+            try {
+                const response = await fetch('/edit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: currentFilename,
+                        page_num: currentPageNum,
+                        element_index: elementIndex,
+                        new_text: newText
+                    })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Server error:', text);
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // Add a delay to ensure file is fully written and closed
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Reload the edited PDF from backend with cache busting
+                const fileResponse = await fetch(`/get_pdf/${currentFilename}?t=${Date.now()}`);
+                const arrayBuffer = await fileResponse.arrayBuffer();
+                
+                // Close old PDF document
+                if (pdfDoc) {
+                    await pdfDoc.destroy();
+                }
+                
+                // Load new PDF document
+                pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                
+                // Re-render the current page
+                await loadPage(currentPageNum);
+            } catch (error) {
+                console.error('Full error:', error);
+                alert('Error updating PDF: ' + error.message);
+            } finally {
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function prevPage() {
+            if (currentPageNum > 0) loadPage(currentPageNum - 1);
+        }
+
+        function nextPage() {
+            if (currentPageNum < totalPages - 1) loadPage(currentPageNum + 1);
+        }
+
+        function downloadPDF() {
+            window.location.href = `/download/${currentFilename}`;
+        }
+
+        document.getElementById('newText').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveEdit();
+        });
+        
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if (e.target.id === 'editModal') closeModal();
+        });
+    </script>
+</body>
+</html>
